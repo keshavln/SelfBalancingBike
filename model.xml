@@ -1,0 +1,97 @@
+<mujoco>
+
+    <visual>
+        <headlight ambient="0.4 0.4 0.4" diffuse="0.6 0.6 0.6" specular="0.1 0.1 0.1"/>
+    </visual>
+
+    <asset><mesh name='chassis' file='meshes/body.stl' scale = '0.5 1 1'/></asset>
+    <asset><mesh name='front_wheel' file='meshes/frontwheel.stl'/></asset>
+    <asset><mesh name='front_wheel_support' file='meshes/frontwheelsupport.stl'/></asset>
+    <asset><mesh name='back_wheel' file='meshes/backwheel.stl'/></asset>
+    <asset><mesh name='back_wheel_support' file='meshes/backwheelsupport.stl'/></asset>
+    <asset><mesh name='reaction_wheel' file='meshes/reactionwheel.stl'/></asset>
+    <asset><mesh name='reaction_wheel_support' file='meshes/reactionwheelsupport.stl'/></asset>
+    <asset><mesh name='weights' file='meshes/weights.stl' scale = '1 2 1'/></asset>
+    <asset><mesh name='back' file='meshes/back.stl'/></asset>
+    <asset>
+        <texture type="skybox" builtin="gradient" rgb1="0.3 0.5 0.7" rgb2="0 0 0" width="512" height="512"/>
+        <texture name="texplane" type="2d" builtin="checker" rgb1="0.2 0.3 0.4" rgb2="0.1 0.15 0.2" 
+             width="512" height="512" mark="cross" markrgb="0.8 0.8 0.8"/>        
+        <material name="matplane" reflectance="0.2" texture="texplane" texrepeat="1 1" texuniform="true"/>
+    </asset>
+
+    <worldbody>
+        <light directional="true" diffuse="0.8 0.8 0.8" specular="0.2 0.2 0.2" pos="0 0 5" dir="0 -1 -1"/>
+        <geom name = 'floor' type = 'plane'  size = '100 100 0.1' material = 'matplane'/>
+        <body name='chassis' pos = '0 0 0.05'>
+            <freejoint name="root"/>
+            <camera name="bike_cam" mode="trackcom" pos="0.3 -0.5 0.15" euler="75 30 0"/>
+            <site name="imu_site" pos="0 0 0" size="0.01" rgba = "0 0 0 0"/>
+            
+            <geom type='mesh' mesh='chassis'/>
+
+            <body name='back' pos='0 0 0'>
+                <geom type='mesh' mesh='back'/>
+            </body>
+
+            <body name='reaction_wheel_support' pos='0 0 0'>
+                <geom type='mesh' mesh='reaction_wheel_support'/>
+                <body name='reaction_wheel' pos='0 0 0'>
+                    <joint name='reaction_wheel_joint' type='hinge' axis='0 1 0' pos = '0 0 0.0575' damping='0.01'/>
+                    <geom type='mesh' mesh='reaction_wheel' />
+                    <body name='weights' pos='0 -0.055 0'>
+                        <geom type='mesh' mesh='weights' density='50000'/>
+                    </body>
+
+                </body>
+            </body>
+
+            <body name='front_wheel_support' pos='0 0 0'>
+                <geom type='mesh' mesh='front_wheel_support'/>
+                <joint name='steering' type='hinge' axis='0 0 1' pos = '0 0.140003 0.0201597' damping = '0.01'/>
+                <body name='front_wheel' pos='0 0 0'>
+                    <joint name='front_wheel_joint' type='hinge' axis='1 0 0' pos = '0 0.140003 0.0201597' damping = '0.01'/>
+                    <geom type='mesh' mesh='front_wheel'/>
+                </body>
+            </body>
+
+            <body name='back_wheel_support' pos='0 0 0'>
+                <geom type='mesh' mesh='back_wheel_support'/>
+                <body name='back_wheel' pos='0 0 0'>
+                    <joint name='back_wheel_joint' type='hinge' axis='1 0 0' pos = '0 -0.065 0.02' damping = '0.01'/>
+                    <geom type='mesh' mesh='back_wheel'/>
+                </body>
+            </body>
+        </body>
+        
+    </worldbody>
+
+    <actuator>
+        <motor name='reaction_wheel_motor' joint='reaction_wheel_joint' ctrlrange='-10 10'/>
+        <motor name='front_wheel_motor' joint='front_wheel_joint' ctrlrange='-10 10'/>
+        <motor name='steering_motor' joint='steering' ctrlrange='-1 1'/>
+        <motor name='back_wheel_motor' joint='back_wheel_joint' ctrlrange='-10 10'/>
+    </actuator>
+
+    <sensor>
+        <framequat name="chassis_orientation" objtype="site" objname="imu_site"/>
+        <frameangvel name="chassis_gyro" objtype="site" objname="imu_site"/>
+    </sensor>
+
+    <contact>
+        <exclude body1='reaction_wheel' body2='chassis'/>
+        <exclude body1='reaction_wheel' body2='back'/>
+        <exclude body1='reaction_wheel' body2='reaction_wheel_support'/>
+        <exclude body1='front_wheel' body2='chassis'/>
+        <exclude body1='front_wheel' body2='back'/>
+        <exclude body1='front_wheel' body2='front_wheel_support'/>
+        <exclude body1='front_wheel' body2='reaction_wheel_support'/>
+        <exclude body1='front_wheel_support' body2='chassis'/>
+        <exclude body1='front_wheel_support' body2='back'/>
+        <exclude body1='front_wheel_support' body2='reaction_wheel_support'/>
+        <exclude body1='back_wheel' body2='chassis'/>
+        <exclude body1='back_wheel' body2='back'/>
+        <exclude body1='back_wheel' body2='back_wheel_support'/>
+        <exclude body1='back_wheel' body2='reaction_wheel_support'/>
+    </contact>
+</mujoco>
