@@ -1,17 +1,46 @@
 import time
+import math
 import mujoco
 import mujoco.viewer
-import math
-import pynput
 import random
+import control
+import numpy as np
 from pynput.keyboard import Key, Listener
 
 #---------CONSTANTS---------
-KP = 7
-KD = 2.5
-VARIATION = 20.0
-EPISODE_LENGTH = 90
+VARIATION = 20.0            # random angle initialization range
+EPISODE_LENGTH = 90      
+m = 0.3788332389620107      # mass
+I_b = 0.00061588            # roll moment of inertia of body
+I_w = 0.00015627            # reaction wheel moment of inertia
+g = 9.81                    # acceleration due to gravity
+l = 0.0957917565221756      # height of center of mass
 #---------------------------
+
+# Solving the Ricatti equation to obtain the gains
+# x = [theta, theta_dot, wheel_speed]
+
+A = np.array([
+    [0, 1, 0],
+    [(m*g*l)/I_b, 0, 0],
+    [-(m*g*l)/I_b, 0, 0]
+])
+
+B = np.array([
+    [0],
+    [-1/I_b],
+    [(I_b + I_w) / (I_b * I_w)] 
+])
+
+Q = np.diag([
+    800.0,
+    10.0,
+    0.0001
+])
+
+R = np.array([[1]])
+
+K, S, E = control.lqr(A, B, Q, R)
 
 m = mujoco.MjModel.from_xml_path('model.xml')
 d = mujoco.MjData(m)
@@ -33,22 +62,21 @@ mujoco.mj_forward(m, d)
 
 # Retrieve sensor and motor IDs
 
-orientation_id = mujoco.mj_name2id(m, mujoco.mjtObj.mjOBJ_SENSOR, "chassis_orientation")
-gyro_id = mujoco.mj_name2id(m, mujoco.mjtObj.mjOBJ_SENSOR, "chassis_gyro")
+sensors = {}
+for sensor in ['chassis_orientation', 'chassis_gyro', 'rxn_gyro']:
+    sensors[sensor] = m.sensor_adr[mujoco.mj_name2id(m, mujoco.mjtObj.mjOBJ_SENSOR, sensor)]
 
-orientation_adr = m.sensor_adr[orientation_id]
-gyro_adr = m.sensor_adr[gyro_id]
-
-reaction_motor = mujoco.mj_name2id(m, mujoco.mjtObj.mjOBJ_ACTUATOR, "reaction_wheel_motor")
-front_motor = mujoco.mj_name2id(m, mujoco.mjtObj.mjOBJ_ACTUATOR, "front_wheel_motor")
-steering_motor = mujoco.mj_name2id(m, mujoco.mjtObj.mjOBJ_ACTUATOR, "steering_motor")
-back_motor = mujoco.mj_name2id(m, mujoco.mjtObj.mjOBJ_ACTUATOR, "back_wheel_motor")
+motors = {}
+for motor in ['reaction', 'front', 'steering', 'back']:
+    motors[motor] = mujoco.mj_name2id(m, mujoco.mjtObj.mjOBJ_ACTUATOR, f"{motor}_motor")
 
 # Global variables controlling speed and steering
 
 forward_speed = 0
 throttle = False
 steer = 0
+
+# Helper functions
 
 def quat_to_rpy(quat):
   w,x,y,z = quat
@@ -82,36 +110,36 @@ listener.start()
 
 with mujoco.viewer.launch_passive(m, d) as viewer:
 
-  #chassis_id = mujoco.mj_name2id(m, mujoco.mjtObj.mjOBJ_BODY, "chassis")
   cam_id = mujoco.mj_name2id(m, mujoco.mjtObj.mjOBJ_CAMERA, "bike_cam")
   viewer.cam.type = mujoco.mjtCamera.mjCAMERA_FIXED
   viewer.cam.fixedcamid = cam_id
 
-  #viewer.cam.distance = 0.2     # How far away the camera is (zoom)
-  #viewer.cam.azimuth = 200         # Angle around the Z-axis (in degrees)
-  #viewer.cam.elevation = -30      # Camera tilt (pitch) down toward the bike
-  #viewer.cam.lookat[:] = [0, 0.05, 0.1]
-
   start = time.time()
+
+  # Main simulation loop
+
   while viewer.is_running() and time.time() - start < EPISODE_LENGTH:
     step_start = time.time()
 
-    d.ctrl[front_motor] = forward_speed
-    d.ctrl[back_motor] = forward_speed
-    d.ctrl[steering_motor] = steer
+    d.ctrl[motors['front']] = forward_speed
+    d.ctrl[motors['back']] = forward_speed
+    d.ctrl[motors['steering']] = steer
 
-    rpy = quat_to_rpy(d.sensordata[orientation_adr : orientation_adr + 4])
-    wrpy = d.sensordata[gyro_adr : gyro_adr + 3]
+    # Obtaining current state
+
+    rpy = quat_to_rpy(d.sensordata[sensors['chassis_orientation'] : sensors['chassis_orientation'] + 4])
+    wrpy = d.sensordata[sensors['chassis_gyro'] : sensors['chassis_gyro'] + 3]
+    rxn_speed = d.sensordata[sensors['rxn_gyro']+1]
     pitch = rpy[1]
     pitch_rate = wrpy[1]
 
-    # PID Control
-    acceleration = KP*pitch + KD*pitch_rate
+    # LQR control
+    
+    output = -K[0][0]*pitch - K[0][1]*pitch_rate - K[0][2]*rxn_speed
 
-    d.ctrl[reaction_motor] += m.opt.timestep * acceleration
+    d.ctrl[motors['reaction']] += m.opt.timestep * output
 
     mujoco.mj_step(m, d)
-    print("speed", forward_speed)
 
     if not throttle:
       forward_speed += -forward_speed * 0.001
