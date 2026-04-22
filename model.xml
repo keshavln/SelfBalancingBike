@@ -1,5 +1,4 @@
 <mujoco>
-
     <visual>
         <headlight ambient="0.4 0.4 0.4" diffuse="0.6 0.6 0.6" specular="0.1 0.1 0.1"/>
     </visual>
@@ -39,8 +38,9 @@
                 <body name='reaction_wheel' pos='0 0 0'>
                     <joint name='reaction_wheel_joint' type='hinge' axis='0 1 0' pos = '0 0 0.0575' damping='0.01'/>
                     <geom type='mesh' mesh='reaction_wheel' />
+                    <site name="rxn_site" pos="0 0 0" size="0.01" rgba = "0 0 0 0"/>
                     <body name='weights' pos='0 -0.055 0'>
-                        <geom type='mesh' mesh='weights' density='50000'/>
+                        <geom type='mesh' mesh='weights' density='6000'/>
                     </body>
 
                 </body>
@@ -67,15 +67,16 @@
     </worldbody>
 
     <actuator>
-        <motor name='reaction_wheel_motor' joint='reaction_wheel_joint' ctrlrange='-10 10'/>
-        <motor name='front_wheel_motor' joint='front_wheel_joint' ctrlrange='-10 10'/>
+        <motor name='reaction_motor' joint='reaction_wheel_joint' ctrlrange='-10 10'/>
+        <motor name='front_motor' joint='front_wheel_joint' ctrlrange='-10 10'/>
         <motor name='steering_motor' joint='steering' ctrlrange='-1 1'/>
-        <motor name='back_wheel_motor' joint='back_wheel_joint' ctrlrange='-10 10'/>
+        <motor name='back_motor' joint='back_wheel_joint' ctrlrange='-10 10'/>
     </actuator>
 
     <sensor>
         <framequat name="chassis_orientation" objtype="site" objname="imu_site"/>
         <frameangvel name="chassis_gyro" objtype="site" objname="imu_site"/>
+        <frameangvel name="rxn_gyro" objtype="site" objname="rxn_site"/>
     </sensor>
 
     <contact>
